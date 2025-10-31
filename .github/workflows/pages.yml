@@ -27,27 +27,26 @@ jobs:
         run: |
           dotnet tool install -g XMLDoc2Markdown --version 5.0.0
           echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
-
-      - name: Build all projects
-        run: |
-          for proj in $(find src -name '*.csproj'); do
-            echo "Building $proj"
-            dotnet build "$proj" -c Debug
-          done
-
-      - name: Generate API Markdown
+      
+      - name: Build & Publish (self-contained) and Generate Markdown
         run: |
           mkdir -p docs/api
-          for proj in $(find src -name '*.csproj'); do
+          for proj in $(find src -name '*.csproj' ! -name '*.Tests.csproj'); do
             projdir=$(dirname "$proj")
             projname=$(basename "$proj" .csproj)
-            dll="$projdir/bin/Debug/net9.0/$projname.dll"
+            pubdir="$projdir/publish-docs"
+            # 1) publish self-contained so all framework deps are local
+            dotnet publish "$proj" -c Release -f net9.0 -r linux-x64 --self-contained true -o "$pubdir"
+            dll="$pubdir/$projname.dll"
             outdir="docs/api/$projname"
             if [ -f "$dll" ]; then
               echo "Generating Markdown for $projname"
-              dotnet xmldoc2md "$dll" -o "$outdir" --structure flat --github-pages
+              # 2) run from inside publish folder to simplify probing
+              pushd "$pubdir" >/dev/null
+              xmldoc2md "$dll" -o "$GITHUB_WORKSPACE/$outdir" --structure flat --github-pages
+              popd >/dev/null
             else
-              echo "⚠️ Skipping $projname (no DLL found)"
+              echo "⚠️ Skipping $projname (no DLL found at $dll)"
             fi
           done
 
