@@ -1,5 +1,6 @@
 param(
   [string]$SrcRoot = "src",
+  [string]$Framework = "net9.0",
   [string]$OutRoot = "docs/api"
 )
 
@@ -15,18 +16,10 @@ $outRootPath = Join-Path $repoRoot $OutRoot
 if (Test-Path $outRootPath) { Remove-Item $outRootPath -Recurse -Force }
 New-Item -ItemType Directory -Path $outRootPath | Out-Null
 
-# Ensure docfx is available (works on Linux too)
-if (-not (Get-Command docfx -ErrorAction SilentlyContinue)) {
-    dotnet tool install -g docfx
-    $toolsPath = if ($env:USERPROFILE) {
-        Join-Path $env:USERPROFILE ".dotnet/tools"
-    } elseif ($env:HOME) {
-        Join-Path $env:HOME ".dotnet/tools"
-    }
-    if ($toolsPath) {
-        $env:PATH = "$env:PATH:$toolsPath"
-    }
-}
+# Restore local tools (ensures xmldocmarkdown exists)
+Push-Location $repoRoot
+dotnet tool restore
+Pop-Location
 
 # Find all .csproj under /src
 $projects = Get-ChildItem -Path $srcPath -Recurse -Filter "*.csproj"
@@ -35,15 +28,20 @@ if (-not $projects) { throw "No .csproj files found under $SrcRoot" }
 foreach ($proj in $projects) {
     $projDir = Split-Path $proj.FullName -Parent
     $projName = [IO.Path]::GetFileNameWithoutExtension($proj.Name)
-    $projOutput = Join-Path $outRootPath $projName
-    New-Item -ItemType Directory -Force -Path $projOutput | Out-Null
+    $outPath = Join-Path $outRootPath $projName
+    $dllPath = Join-Path $projDir "bin/Debug/$Framework/$projName.dll"
 
-    Write-Host "📦 Generating Markdown for $projName"
+    Write-Host "📦 Building $projName"
+    dotnet restore $proj.FullName
+    dotnet build $proj.FullName -c Debug
 
-    Push-Location $projDir
-    docfx metadata $proj.FullName -o "$projOutput/metadata"
-    docfx build "$projOutput/metadata" -o "$projOutput"
-    Pop-Location
+    if (-not (Test-Path $dllPath)) {
+        Write-Warning "⚠️ Skipping $projName — DLL not found ($dllPath)"
+        continue
+    }
+
+    Write-Host "🧾 Generating Markdown for $projName"
+    dotnet xmldocmarkdown $dllPath $outPath --source $projDir --visibility public --clean --namespace-pages
 }
 
-Write-Host "✅ Markdown generated under $outRootPath"
+Write-Host "✅ All Markdown generated under $outRootPath"
