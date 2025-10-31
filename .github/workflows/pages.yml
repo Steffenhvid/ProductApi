@@ -45,7 +45,7 @@ jobs:
             outdir="docs/api/$projname"
             if [ -f "$dll" ]; then
               echo "Generating Markdown for $projname"
-              xmldoc2md "$dll" -o "$outdir" --flat --github-pages
+              xmldoc2md "$dll" -o "$outdir" --structure flat --github-pages
             else
               echo "⚠️ Skipping $projname (no DLL found)"
             fi
