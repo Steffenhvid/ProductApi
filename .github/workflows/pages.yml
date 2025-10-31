@@ -22,9 +22,34 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      # install working version of XMLDoc2Markdown
+      - name: Install XMLDoc2Markdown
+        run: |
+          dotnet tool install -g XMLDoc2Markdown --version 5.0.0
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Build all projects
+        run: |
+          for proj in $(find src -name '*.csproj'); do
+            echo "Building $proj"
+            dotnet build "$proj" -c Debug
+          done
+
       - name: Generate API Markdown
-        shell: pwsh
-        run: ./scripts/build-docs.ps1
+        run: |
+          mkdir -p docs/api
+          for proj in $(find src -name '*.csproj'); do
+            projdir=$(dirname "$proj")
+            projname=$(basename "$proj" .csproj)
+            dll="$projdir/bin/Debug/net9.0/$projname.dll"
+            outdir="docs/api/$projname"
+            if [ -f "$dll" ]; then
+              echo "Generating Markdown for $projname"
+              xmldoc2md "$dll" -o "$outdir" --flat --github-pages
+            else
+              echo "⚠️ Skipping $projname (no DLL found)"
+            fi
+          done
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
