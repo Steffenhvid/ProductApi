@@ -1,0 +1,23 @@
+title: Product API
+theme: just-the-docs
+# If using remote theme instead of the gem:
+# remote_theme: just-the-docs/just-the-docs
+# plugins:
+#   - jekyll-remote-theme
+
+# Optional site settings
+aux_links:
+  "GitHub Repo": https://github.com/Steffenhvid/ProductApi
+
+# Make all .md under docs/ build without front matter
+defaults:
+  - scope:
+      path: "api"
+      type: "pages"
+    values:
+      layout: default
+      nav_order: 100
+      has_children: false
+
+# Build settings
+markdown: kramdown
