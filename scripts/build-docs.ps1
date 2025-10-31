@@ -15,13 +15,20 @@ $outRootPath = Join-Path $repoRoot $OutRoot
 if (Test-Path $outRootPath) { Remove-Item $outRootPath -Recurse -Force }
 New-Item -ItemType Directory -Path $outRootPath | Out-Null
 
-# Install DocFx if missing
+# Ensure docfx is available (works on Linux too)
 if (-not (Get-Command docfx -ErrorAction SilentlyContinue)) {
     dotnet tool install -g docfx
-    $env:PATH = "$env:PATH;$(Join-Path $env:USERPROFILE '.dotnet/tools')"
+    $toolsPath = if ($env:USERPROFILE) {
+        Join-Path $env:USERPROFILE ".dotnet/tools"
+    } elseif ($env:HOME) {
+        Join-Path $env:HOME ".dotnet/tools"
+    }
+    if ($toolsPath) {
+        $env:PATH = "$env:PATH:$toolsPath"
+    }
 }
 
-# Build all projects under /src
+# Find all .csproj under /src
 $projects = Get-ChildItem -Path $srcPath -Recurse -Filter "*.csproj"
 if (-not $projects) { throw "No .csproj files found under $SrcRoot" }
 
@@ -35,7 +42,7 @@ foreach ($proj in $projects) {
 
     Push-Location $projDir
     docfx metadata $proj.FullName -o "$projOutput/metadata"
-    docfx build "$projOutput/metadata" -o "$projOutput" --serve false
+    docfx build "$projOutput/metadata" -o "$projOutput"
     Pop-Location
 }
 
